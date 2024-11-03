@@ -39,3 +39,12 @@ htmlcov/
 # Project specific
 output*.mp4
 temp_audio.mp3
+
+#aider files
+.aider.input.history
+.aider.output.history
+.aider.input
+*aider*
+
+# videos
+*.mp4

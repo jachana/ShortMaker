@@ -6,6 +6,10 @@ import os
 
 def create_frame(text, size=(640, 480), bg_color=(0, 0, 0), text_color='white', 
                 text_size=30, text_position='center'):
+    # Validate size parameter
+    if not isinstance(size, tuple) or len(size) != 2 or size[0] <= 0 or size[1] <= 0:
+        raise ValueError("Size must be a tuple of two positive integers")
+        
     # Create a PIL Image with the background color
     img = Image.new('RGB', size, bg_color)
     draw = ImageDraw.Draw(img)
