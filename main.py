@@ -1,5 +1,9 @@
+from moviepy.config import change_settings
+import os
 
-
+# Configure MoviePy to use ImageMagick
+IMAGEMAGICK_BINARY = os.getenv('IMAGEMAGICK_BINARY', 'C:\\Program Files\\ImageMagick-7.1.1-Q16-HDRI\\magick.exe')
+change_settings({"IMAGEMAGICK_BINARY": IMAGEMAGICK_BINARY})
 
 from gtts import gTTS
 from moviepy.editor import ColorClip, AudioFileClip, VideoFileClip, TextClip, CompositeVideoClip
