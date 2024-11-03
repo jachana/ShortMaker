@@ -2,9 +2,11 @@
 
 
 from gtts import gTTS
-from moviepy.editor import ColorClip, AudioFileClip, VideoFileClip
+from moviepy.editor import ColorClip, AudioFileClip, VideoFileClip, TextClip, CompositeVideoClip
 
-def create_video_from_text(text, output_filename="output.mp4", duration=None):
+def create_video_from_text(text, output_filename="output.mp4", duration=None, 
+                          bg_color=(0, 0, 0), text_color='white', 
+                          text_size=30, text_position='center'):
     # Create speech from text
     tts = gTTS(text=text, lang='en')
     tts.save("temp_audio.mp3")
@@ -16,13 +18,22 @@ def create_video_from_text(text, output_filename="output.mp4", duration=None):
     if duration is None:
         duration = audio.duration
     
-    # Create a simple black background
+    # Create background
     size = (640, 480)
-    bg_color = (0, 0, 0)
     video = ColorClip(size, bg_color, duration=duration)
     
-    # Combine video with audio
-    final_video = video.set_audio(audio)
+    # Create text overlay
+    txt_clip = TextClip(text, fontsize=text_size, color=text_color)
+    
+    # Position the text
+    if text_position == 'center':
+        txt_clip = txt_clip.set_position('center').set_duration(duration)
+    elif isinstance(text_position, tuple):
+        txt_clip = txt_clip.set_position(text_position).set_duration(duration)
+    
+    # Combine background, text, and audio
+    final_video = CompositeVideoClip([video, txt_clip])
+    final_video = final_video.set_audio(audio)
     
     # Write the result
     final_video.write_videofile(output_filename, fps=24)
@@ -34,4 +45,11 @@ def create_video_from_text(text, output_filename="output.mp4", duration=None):
 # Example usage
 if __name__ == "__main__":
     sample_text = "Hello! This is a test video created from text."
-    create_video_from_text(sample_text)
+    
+    # Example with custom styling
+    create_video_from_text(
+        sample_text,
+        bg_color=(25, 25, 112),  # Midnight Blue
+        text_color='yellow',
+        text_size=40
+    )
