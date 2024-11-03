@@ -2,6 +2,23 @@
 
 A Python script that converts text into video with speech. It creates a video with customizable background color and text overlay, along with computer-generated speech narration. You can also use your own video as a background.
 
+## Project Structure
+
+```
+text-to-video-generator/
+├── src/
+│   └── main.py         # Main source code
+├── examples/
+│   ├── output.mp4                    # Example output video
+│   ├── background video.mp4          # Sample background video
+│   └── output_with_background.mp4    # Example with background
+├── docs/
+│   └── README.md       # Project documentation
+├── tests/              # Test files
+├── requirements.txt    # Project dependencies
+└── .gitignore         # Git ignore file
+```
+
 ## Features
 
 - Converts text to speech using Google's Text-to-Speech (gTTS)
@@ -32,7 +49,7 @@ pip install moviepy pillow numpy gtts
 Basic usage:
 
 ```python
-from main import create_video_from_text
+from src.main import create_video_from_text
 
 create_video_from_text("Hello! This is a test video.")
 ```
@@ -40,6 +57,8 @@ create_video_from_text("Hello! This is a test video.")
 Advanced usage with custom styling:
 
 ```python
+from src.main import create_video_from_text
+
 create_video_from_text(
     text="Your text here",
     output_filename="custom_output.mp4",
@@ -53,12 +72,14 @@ create_video_from_text(
 Using a background video:
 
 ```python
+from src.main import create_video_from_text
+
 create_video_from_text(
     text="Your text here",
     output_filename="video_background.mp4",
     text_color='white',
     text_size=40,
-    background_video="path_to_your_video.mp4"
+    background_video="examples/background video.mp4"  # Updated path
 )
 ```
 
