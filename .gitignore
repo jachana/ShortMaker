@@ -1,1 +1,20 @@
 .aider*
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Generated media files
+*.mp4
+*.mp3
+temp_audio*
+
+# IDE
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
