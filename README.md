@@ -1,6 +1,6 @@
 # Text-to-Video Generator
 
-A Python script that converts text into video with speech. It creates a video with customizable background color and text overlay, along with computer-generated speech narration.
+A Python script that converts text into video with speech. It creates a video with customizable background color and text overlay, along with computer-generated speech narration. You can also use your own video as a background.
 
 ## Features
 
@@ -8,6 +8,8 @@ A Python script that converts text into video with speech. It creates a video wi
 - Creates video with customizable background and text styling
 - Supports centered or custom text positioning
 - Automatically synchronizes video duration with speech
+- Supports custom video backgrounds with automatic looping/trimming
+- Text overlay with semi-transparent background for better visibility
 
 ## Installation
 
@@ -48,6 +50,18 @@ create_video_from_text(
 )
 ```
 
+Using a background video:
+
+```python
+create_video_from_text(
+    text="Your text here",
+    output_filename="video_background.mp4",
+    text_color='white',
+    text_size=40,
+    background_video="path_to_your_video.mp4"
+)
+```
+
 ## Parameters
 
 - `text` (str): The text to convert into video
@@ -57,6 +71,7 @@ create_video_from_text(
 - `text_color` (str, optional): Text color. Default: 'white'
 - `text_size` (int, optional): Font size. Default: 30
 - `text_position` (str/tuple, optional): Text position. Can be 'center' or (x, y) coordinates. Default: 'center'
+- `background_video` (str, optional): Path to a video file to use as background. If provided, bg_color is ignored
 
 ## Generated Files
 
@@ -68,4 +83,9 @@ The script generates:
 
 - Uses PIL for text rendering
 - Requires an internet connection for text-to-speech conversion
-- Video resolution is fixed at 640x480 pixels
+- When using a background video:
+  - If the video is shorter than the audio, it will loop automatically
+  - If the video is longer than the audio, it will be trimmed
+  - Text is overlaid with semi-transparent background for better visibility
+- Default video resolution is 640x480 pixels when not using a background video
+- When using a background video, output resolution matches the background video resolution
