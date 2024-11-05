@@ -10,6 +10,7 @@ A Python utility for creating short videos from text with optional background vi
 - Automatic video duration based on speech length
 - Clean temporary file handling
 - Multiple TTS providers support (Google TTS, ElevenLabs, OpenAI)
+- **NEW: Text Chunking for Long Text Videos**
 
 ## Installation
 
@@ -18,6 +19,8 @@ pip install -r requirements.txt
 ```
 
 ## Usage
+
+### Basic Video Creation
 
 ```python
 from src.main import create_video_from_text
@@ -37,6 +40,27 @@ create_video_from_text(
     background_video="background.mp4"
 )
 ```
+
+### Text Chunking for Long Text
+
+For longer texts, use the new text chunking feature:
+
+```python
+# Automatically split long text into chunks
+create_video_from_text(
+    "A very long text that needs to be split into multiple chunks...",
+    output_filename="long_text_video.mp4",
+    max_chunk_length=100,   # Customize maximum chunk length
+    chunk_overlap=20        # Customize overlap between chunks
+)
+```
+
+#### Text Chunking Features
+- Automatically splits long text into readable chunks
+- Configurable chunk length
+- Smooth transitions between text chunks
+- Works with all TTS providers
+- Optional chunk overlap for context preservation
 
 ### Using ElevenLabs TTS
 
@@ -73,6 +97,7 @@ Tests cover:
 - Custom frame sizes
 - Custom colors and text positions
 - Video creation with and without background
+- Text chunking functionality
 - Error handling for invalid inputs
 
 ## Requirements
