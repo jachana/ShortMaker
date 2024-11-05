@@ -3,6 +3,61 @@ from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import AudioFileClip, VideoFileClip, VideoClip, concatenate_videoclips
 from src.tts_providers import TTSProvider, GTTSProvider
 import os
+import logging
+import re
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger(__name__)
+
+def split_text_into_chunks(text, max_chunk_length=300, chunk_overlap=50):
+    """
+    Split long text into chunks with optional overlap.
+    
+    Args:
+        text (str): The input text to be split
+        max_chunk_length (int): Maximum length of each chunk
+        chunk_overlap (int): Number of words to overlap between chunks
+    
+    Returns:
+        list: A list of text chunks
+    """
+    # Remove extra whitespace and split into sentences
+    text = re.sub(r'\s+', ' ', text).strip()
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    
+    chunks = []
+    current_chunk = []
+    current_length = 0
+    
+    for i, sentence in enumerate(sentences):
+        # Check if adding this sentence would exceed max length
+        sentence_length = len(sentence)
+        
+        # If current chunk would become too long, start a new chunk
+        if current_length + sentence_length > max_chunk_length and current_chunk:
+            # Join current chunk and add to chunks
+            chunk_text = ' '.join(current_chunk)
+            chunks.append(chunk_text)
+            
+            # Start new chunk with this sentence
+            current_chunk = [sentence]
+            current_length = sentence_length
+        else:
+            # Add sentence to current chunk
+            current_chunk.append(sentence)
+            current_length += sentence_length + 1  # +1 for space
+    
+    # Add the last chunk if not empty
+    if current_chunk:
+        chunks.append(' '.join(current_chunk))
+    
+    # Log chunk information
+    logger.info(f"Number of text chunks: {len(chunks)}")
+    for i, chunk in enumerate(chunks, 1):
+        logger.info(f"Chunk {i}: {chunk}")
+    
+    return chunks
 
 def create_frame(text, size=(640, 480), bg_color=(0, 0, 0), text_color='white', 
                 text_size=30, text_position='center'):
@@ -20,70 +75,72 @@ def create_frame(text, size=(640, 480), bg_color=(0, 0, 0), text_color='white',
     except:
         font = ImageFont.load_default()
     
-    # Get text size
-    text_bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = text_bbox[2] - text_bbox[0]
-    text_height = text_bbox[3] - text_bbox[1]
+    # Dynamically adjust text size to fit the screen
+    def get_wrapped_text(text, font, max_width):
+        lines = []
+        words = text.split()
+        current_line = words[0]
+        
+        for word in words[1:]:
+            # Check if adding the word would exceed max width
+            test_line = current_line + " " + word
+            text_bbox = draw.textbbox((0, 0), test_line, font=font)
+            line_width = text_bbox[2] - text_bbox[0]
+            
+            if line_width <= max_width:
+                current_line = test_line
+            else:
+                lines.append(current_line)
+                current_line = word
+        
+        lines.append(current_line)
+        return lines
+
+    # Reduce text size until it fits
+    while text_size > 10:
+        font = ImageFont.truetype("arial.ttf", text_size)
+        wrapped_text = get_wrapped_text(text, font, size[0] - 40)  # 40px padding
+        
+        # Calculate total text height
+        text_lines = []
+        for line in wrapped_text:
+            text_bbox = draw.textbbox((0, 0), line, font=font)
+            text_lines.append(text_bbox)
+        
+        total_text_height = sum(line[3] - line[1] for line in text_lines)
+        line_spacing = text_size // 4
+        total_height = total_text_height + (len(wrapped_text) - 1) * line_spacing
+        
+        if total_height <= size[1] - 40:  # 40px padding
+            break
+        
+        text_size -= 2
     
-    # Calculate text position
+    # Calculate vertical position
     if text_position == 'center':
-        x = (size[0] - text_width) // 2
-        y = (size[1] - text_height) // 2
-    elif isinstance(text_position, tuple):
-        x, y = text_position
+        y = (size[1] - total_height) // 2
     else:
-        x = 0
-        y = 0
+        y = 20  # Default top padding
     
-    # Draw text
-    draw.text((x, y), text, font=font, fill=text_color)
+    # Draw wrapped text
+    for line in wrapped_text:
+        text_bbox = draw.textbbox((0, 0), line, font=font)
+        line_width = text_bbox[2] - text_bbox[0]
+        
+        # Horizontal centering
+        x = (size[0] - line_width) // 2
+        
+        draw.text((x, y), line, font=font, fill=text_color)
+        y += text_bbox[3] - text_bbox[1] + line_spacing
     
     # Convert PIL image to numpy array
     return np.array(img)
-
-def split_text_into_chunks(text, max_chunk_length=100, overlap=20):
-    """
-    Split long text into chunks with optional overlap.
-    
-    Args:
-        text (str): The input text to be split
-        max_chunk_length (int): Maximum length of each chunk
-        overlap (int): Number of words to overlap between chunks
-    
-    Returns:
-        list: A list of text chunks
-    """
-    # Remove leading/trailing whitespace and split text into words
-    words = text.strip().split()
-    
-    chunks = []
-    current_chunk = []
-    
-    for word in words:
-        current_chunk.append(word)
-        
-        # If current chunk exceeds max length, create a new chunk
-        if len(' '.join(current_chunk)) > max_chunk_length:
-            # Add the chunk (excluding the last few overlapping words)
-            chunks.append(' '.join(current_chunk[:-overlap] if overlap > 0 else current_chunk))
-            
-            # Start next chunk with overlapping words
-            current_chunk = current_chunk[-overlap:] if overlap > 0 else []
-    
-    # Add the last chunk if not empty
-    if current_chunk:
-        chunks.append(' '.join(current_chunk))
-    
-    # Filter out empty chunks
-    chunks = [chunk for chunk in chunks if chunk.strip()]
-    
-    return chunks
 
 def create_video_from_text(text, output_filename="output.mp4", duration=None, 
                          bg_color=(0, 0, 0), text_color='white', 
                          text_size=30, text_position='center',
                          background_video=None, tts_provider: TTSProvider = None,
-                         max_chunk_length=100, chunk_overlap=20):
+                         max_chunk_length=300, chunk_overlap=50):
     # Use default GTTSProvider if none specified
     if tts_provider is None:
         tts_provider = GTTSProvider()
@@ -93,7 +150,6 @@ def create_video_from_text(text, output_filename="output.mp4", duration=None,
     
     # Prepare video clips for each chunk
     video_clips = []
-    audio_clips = []
     
     for chunk in text_chunks:
         # Generate speech for this chunk
@@ -145,9 +201,8 @@ def create_video_from_text(text, output_filename="output.mp4", duration=None,
         # Add audio to video chunk
         chunk_video = chunk_video.set_audio(audio)
         video_clips.append(chunk_video)
-        audio_clips.append(audio)
     
-    # Concatenate all video chunks
+    # Concatenate all video clips
     final_video = concatenate_videoclips(video_clips)
     
     # Write the result
@@ -155,8 +210,6 @@ def create_video_from_text(text, output_filename="output.mp4", duration=None,
     
     # Clean up
     final_video.close()
-    for audio in audio_clips:
-        audio.close()
     
     # Remove temporary audio files
     for chunk_file in os.listdir('.'):
