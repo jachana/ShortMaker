@@ -5,6 +5,7 @@ from src.tts_providers import TTSProvider, GTTSProvider
 import os
 import logging
 import re
+import copy
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -179,18 +180,19 @@ def create_video_from_text(text, output_filename="output.mp4", duration=None,
         background_video_clip = VideoFileClip(background_video)
     
     for i, data in enumerate(chunk_data):
-        chunk = data['text']
+        # Create a deep copy of the chunk to prevent reference issues
+        chunk = copy.deepcopy(data['text'])
         audio = data['audio']
         chunk_duration = data['duration']
         
         # Create a function to generate frames for this specific chunk
-        def make_frame(t):
+        def make_frame(t, current_chunk=chunk):
             if background_video_clip:
                 # Get background frame
                 video_frame = background_video_clip.get_frame(t % background_video_clip.duration)
                 
                 # Create text frame
-                text_frame = create_frame(chunk, size=(video_frame.shape[1], video_frame.shape[0]),
+                text_frame = create_frame(current_chunk, size=(video_frame.shape[1], video_frame.shape[0]),
                                        text_color=text_color, text_size=text_size,
                                        text_position=text_position)
                 
@@ -198,7 +200,7 @@ def create_video_from_text(text, output_filename="output.mp4", duration=None,
                 return video_frame * 0.7 + text_frame * 0.3
             else:
                 # Create frame with solid background
-                return create_frame(chunk, text_color=text_color, text_size=text_size,
+                return create_frame(current_chunk, text_color=text_color, text_size=text_size,
                                  text_position=text_position, bg_color=bg_color)
         
         # Create the video clip for this chunk
