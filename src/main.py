@@ -1,7 +1,7 @@
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import AudioFileClip, VideoFileClip, VideoClip
-from .tts_providers import TTSProvider, GTTSProvider
+from src.tts_providers import TTSProvider, GTTSProvider
 import os
 
 def create_frame(text, size=(640, 480), bg_color=(0, 0, 0), text_color='white', 
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     )
     
     # Example with ElevenLabs
-    from .tts_providers import ElevenLabsProvider
+    from src.tts_providers import ElevenLabsProvider
     eleven_labs_provider = ElevenLabsProvider(
         api_key="your-api-key",
         voice_id="your-voice-id"
@@ -139,7 +139,7 @@ if __name__ == "__main__":
     )
     
     # Example with OpenAI
-    from .tts_providers import OpenAITTSProvider
+    from src.tts_providers import OpenAITTSProvider
     openai_provider = OpenAITTSProvider(
         api_key="your-api-key",
         voice="alloy"
