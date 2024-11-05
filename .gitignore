@@ -38,7 +38,13 @@ htmlcov/
 
 # Project specific
 output*.mp4
-temp_audio.mp3
+temp_audio*.mp3
+temp_audio*.wav
+temp_video*.mp4
+
+# Temporary files for text chunking
+chunk_*.mp3
+chunk_*.mp4
 
 #aider files
 .aider.input.history
@@ -46,6 +52,15 @@ temp_audio.mp3
 .aider.input
 *aider*
 
-# videos
+# Media files
 *.mp4
 *.mp3
+*.wav
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Sensitive information
+.env
+*.key
