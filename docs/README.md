@@ -9,9 +9,9 @@ text-to-video-generator/
 ├── src/
 │   └── main.py         # Main source code
 ├── examples/
-│   ├── output.mp4                    # Example output video
-│   ├── background video.mp4          # Sample background video
-│   └── output_with_background.mp4    # Example with background
+│   ├── output.mp4                  # Example output video
+│   ├── background.mp4             # Sample background video
+│   └── output_with_background.mp4 # Example with background
 ├── docs/
 │   └── README.md       # Project documentation
 ├── tests/              # Test files
@@ -27,6 +27,10 @@ text-to-video-generator/
 - Automatically synchronizes video duration with speech
 - Supports custom video backgrounds with automatic looping/trimming
 - Text overlay with semi-transparent background for better visibility
+- Multiple TTS provider support:
+  - Google Text-to-Speech (gTTS)
+  - ElevenLabs
+  - OpenAI TTS
 
 ## Installation
 
@@ -43,6 +47,8 @@ Or install required packages manually:
 ```bash
 pip install moviepy pillow numpy gtts
 ```
+
+Additional dependencies for ElevenLabs and OpenAI:
 
 ## Usage
 
