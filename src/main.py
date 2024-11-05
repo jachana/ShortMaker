@@ -1,11 +1,70 @@
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from gtts import gTTS
-from moviepy.editor import AudioFileClip, VideoFileClip, VideoClip
+from moviepy.editor import AudioFileClip, VideoFileClip, VideoClip, concatenate_videoclips
+from src.tts_providers import TTSProvider, GTTSProvider
 import os
+import logging
+import re
+import copy
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger(__name__)
+
+def split_text_into_chunks(text, max_chunk_length=300, chunk_overlap=50):
+    """
+    Split long text into chunks with optional overlap.
+    
+    Args:
+        text (str): The input text to be split
+        max_chunk_length (int): Maximum length of each chunk
+        chunk_overlap (int): Number of words to overlap between chunks
+    
+    Returns:
+        list: A list of text chunks
+    """
+    # Remove extra whitespace and split into sentences
+    text = re.sub(r'\s+', ' ', text).strip()
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    
+    chunks = []
+    current_chunk = []
+    current_length = 0
+    
+    for i, sentence in enumerate(sentences):
+        # Check if adding this sentence would exceed max length
+        sentence_length = len(sentence)
+        
+        # If current chunk would become too long, start a new chunk
+        if current_length + sentence_length > max_chunk_length and current_chunk:
+            # Join current chunk and add to chunks
+            chunk_text = ' '.join(current_chunk)
+            chunks.append(chunk_text)
+            
+            # Start new chunk with this sentence
+            current_chunk = [sentence]
+            current_length = sentence_length
+        else:
+            # Add sentence to current chunk
+            current_chunk.append(sentence)
+            current_length += sentence_length + 1  # +1 for space
+    
+    # Add the last chunk if not empty
+    if current_chunk:
+        chunks.append(' '.join(current_chunk))
+    
+    # Log chunk information
+    logger.info(f"Number of text chunks: {len(chunks)}")
+    for i, chunk in enumerate(chunks, 1):
+        logger.info(f"Chunk {i}: {chunk}")
+    
+    return chunks
 
 def create_frame(text, size=(640, 480), bg_color=(0, 0, 0), text_color='white', 
                 text_size=30, text_position='center'):
+    """
+    Create a video frame with text.
+    """
     # Validate size parameter
     if not isinstance(size, tuple) or len(size) != 2 or size[0] <= 0 or size[1] <= 0:
         raise ValueError("Size must be a tuple of two positive integers")
@@ -20,20 +79,63 @@ def create_frame(text, size=(640, 480), bg_color=(0, 0, 0), text_color='white',
     except:
         font = ImageFont.load_default()
     
-    # Get text size
-    text_bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = text_bbox[2] - text_bbox[0]
-    text_height = text_bbox[3] - text_bbox[1]
+    # Dynamically adjust text size to fit the screen
+    def get_wrapped_text(text, font, max_width):
+        lines = []
+        words = text.split()
+        current_line = words[0]
+        
+        for word in words[1:]:
+            # Check if adding the word would exceed max width
+            test_line = current_line + " " + word
+            text_bbox = draw.textbbox((0, 0), test_line, font=font)
+            line_width = text_bbox[2] - text_bbox[0]
+            
+            if line_width <= max_width:
+                current_line = test_line
+            else:
+                lines.append(current_line)
+                current_line = word
+        
+        lines.append(current_line)
+        return lines
+
+    # Reduce text size until it fits
+    while text_size > 10:
+        font = ImageFont.truetype("arial.ttf", text_size)
+        wrapped_text = get_wrapped_text(text, font, size[0] - 40)  # 40px padding
+        
+        # Calculate total text height
+        text_lines = []
+        for line in wrapped_text:
+            text_bbox = draw.textbbox((0, 0), line, font=font)
+            text_lines.append(text_bbox)
+        
+        total_text_height = sum(line[3] - line[1] for line in text_lines)
+        line_spacing = text_size // 4
+        total_height = total_text_height + (len(wrapped_text) - 1) * line_spacing
+        
+        if total_height <= size[1] - 40:  # 40px padding
+            break
+        
+        text_size -= 2
     
-    # Calculate text position
+    # Calculate vertical position
     if text_position == 'center':
-        x = (size[0] - text_width) // 2
-        y = (size[1] - text_height) // 2
-    elif isinstance(text_position, tuple):
-        x, y = text_position
+        y = (size[1] - total_height) // 2
+    else:
+        y = 20  # Default top padding
     
-    # Draw text
-    draw.text((x, y), text, font=font, fill=text_color)
+    # Draw wrapped text
+    for line in wrapped_text:
+        text_bbox = draw.textbbox((0, 0), line, font=font)
+        line_width = text_bbox[2] - text_bbox[0]
+        
+        # Horizontal centering
+        x = (size[0] - line_width) // 2
+        
+        draw.text((x, y), line, font=font, fill=text_color)
+        y += text_bbox[3] - text_bbox[1] + line_spacing
     
     # Convert PIL image to numpy array
     return np.array(img)
@@ -41,79 +143,106 @@ def create_frame(text, size=(640, 480), bg_color=(0, 0, 0), text_color='white',
 def create_video_from_text(text, output_filename="output.mp4", duration=None, 
                          bg_color=(0, 0, 0), text_color='white', 
                          text_size=30, text_position='center',
-                         background_video=None):
-    # Create speech from text
-    tts = gTTS(text=text, lang='en')
-    tts.save("temp_audio.mp3")
+                         background_video=None, tts_provider: TTSProvider = None,
+                         max_chunk_length=300, chunk_overlap=50):
+    """
+    Create a video from text with synchronized audio and text display.
+    """
+    # Use default GTTSProvider if none specified
+    if tts_provider is None:
+        tts_provider = GTTSProvider()
     
-    # Load the audio to get its duration
-    audio = AudioFileClip("temp_audio.mp3")
+    # Split text into chunks
+    text_chunks = split_text_into_chunks(text, max_chunk_length, chunk_overlap)
     
-    # If duration not specified, use audio duration
-    if duration is None:
-        duration = audio.duration
-
+    # Generate all audio chunks first and get their durations
+    chunk_data = []
+    for i, chunk in enumerate(text_chunks):
+        temp_audio_path = f"temp_audio_chunk_{i}.mp3"
+        tts_provider.generate_speech(chunk, temp_audio_path)
+        audio = AudioFileClip(temp_audio_path)
+        chunk_data.append({
+            'text': chunk,
+            'audio': audio,
+            'duration': audio.duration,
+            'audio_path': temp_audio_path
+        })
+    
+    # Prepare video clips for each chunk
+    video_clips = []
+    
+    # Prepare background video if used
+    background_video_clip = None
     if background_video:
-        # Load the background video
-        video = VideoFileClip(background_video)
-        
-        # Loop the video if it's shorter than the audio
-        if video.duration < duration:
-            video = video.loop(duration=duration)
-        # Trim the video if it's longer than the audio
-        else:
-            video = video.subclip(0, duration)
-        
-        # Create a frame with the text
-        text_frame = create_frame(text, size=video.size, text_color=text_color, 
-                                text_size=text_size, text_position=text_position)
-        
-        # Create a function to overlay text on video frames
-        def combine_frame(get_frame, t):
-            video_frame = get_frame(t)
-            # Create a semi-transparent overlay for better text visibility
-            overlay = np.zeros_like(video_frame)
-            overlay[text_frame > 0] = text_frame[text_frame > 0]
-            return video_frame * 0.7 + overlay * 0.3  # Adjust blend factors as needed
-        
-        # Create the final video with text overlay
-        final_video = VideoClip(lambda t: combine_frame(video.get_frame, t), 
-                              duration=duration)
-    else:
-        # Create a frame with the text (original functionality)
-        frame = create_frame(text, bg_color=bg_color, text_color=text_color, 
-                            text_size=text_size, text_position=text_position)
-        
-        def make_frame(t):
-            return frame
-        
-        final_video = VideoClip(make_frame, duration=duration)
+        background_video = os.path.normpath(background_video)
+        if not os.path.exists(background_video):
+            raise FileNotFoundError(f"Background video not found: {background_video}")
+        background_video_clip = VideoFileClip(background_video)
     
-    # Add audio to video
-    final_video = final_video.set_audio(audio)
+    for i, data in enumerate(chunk_data):
+        # Create a deep copy of the chunk to prevent reference issues
+        chunk = copy.deepcopy(data['text'])
+        audio = data['audio']
+        chunk_duration = data['duration']
+        
+        # Create a function to generate frames for this specific chunk
+        def make_frame(t, current_chunk=chunk):
+            if background_video_clip:
+                # Get background frame
+                video_frame = background_video_clip.get_frame(t % background_video_clip.duration)
+                
+                # Create text frame
+                text_frame = create_frame(current_chunk, size=(video_frame.shape[1], video_frame.shape[0]),
+                                       text_color=text_color, text_size=text_size,
+                                       text_position=text_position)
+                
+                # Blend frames
+                return video_frame * 0.7 + text_frame * 0.3
+            else:
+                # Create frame with solid background
+                return create_frame(current_chunk, text_color=text_color, text_size=text_size,
+                                 text_position=text_position, bg_color=bg_color)
+        
+        # Create the video clip for this chunk
+        if background_video_clip:
+            # Trim or loop background video to match chunk duration
+            if background_video_clip.duration < chunk_duration:
+                background_video_clip = background_video_clip.loop(duration=chunk_duration)
+            else:
+                background_video_clip = background_video_clip.subclip(0, chunk_duration)
+        
+        chunk_video = VideoClip(make_frame, duration=chunk_duration)
+        chunk_video = chunk_video.set_audio(audio)
+        video_clips.append(chunk_video)
+    
+    # Concatenate all video clips
+    final_video = concatenate_videoclips(video_clips)
     
     # Write the result
     final_video.write_videofile(output_filename, fps=24)
     
     # Clean up
-    audio.close()
     final_video.close()
-    if background_video:
-        video.close()
+    if background_video_clip:
+        background_video_clip.close()
     
-    # Remove temporary audio file
-    if os.path.exists("temp_audio.mp3"):
-        os.remove("temp_audio.mp3")
+    for data in chunk_data:
+        audio = data['audio']
+        audio_path = data['audio_path']
+        audio.close()
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
 
-# Example usage
+# Example usage remains the same
 if __name__ == "__main__":
-    sample_text = "Hello! This is a test video with a background video."
+    sample_text = "Hello! This is a test video with a background video. We are demonstrating text chunking functionality to break down long text into smaller, more manageable pieces that can be displayed sequentially during video generation."
     
-    # Test with background video
+    # Example with default gTTS
     create_video_from_text(
         sample_text,
-        output_filename="output_with_background.mp4",
+        output_filename="output_chunked_default.mp4",
         text_color='white',
         text_size=40,
-        background_video="background video.mp4"
+        max_chunk_length=100,  # Customize chunk length
+        chunk_overlap=20       # Customize overlap between chunks
     )
