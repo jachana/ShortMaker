@@ -60,10 +60,9 @@ def split_text_into_chunks(text, max_chunk_length=300, chunk_overlap=50):
     return chunks
 
 def create_frame(text, size=(640, 480), bg_color=(0, 0, 0), text_color='white', 
-                text_size=30, text_position='center', fade_factor=1.0):
+                text_size=30, text_position='center'):
     """
     Create a video frame with text.
-    Added fade_factor parameter for smooth transitions.
     """
     # Validate size parameter
     if not isinstance(size, tuple) or len(size) != 2 or size[0] <= 0 or size[1] <= 0:
@@ -126,7 +125,7 @@ def create_frame(text, size=(640, 480), bg_color=(0, 0, 0), text_color='white',
     else:
         y = 20  # Default top padding
     
-    # Draw wrapped text with fade effect
+    # Draw wrapped text
     for line in wrapped_text:
         text_bbox = draw.textbbox((0, 0), line, font=font)
         line_width = text_bbox[2] - text_bbox[0]
@@ -134,16 +133,7 @@ def create_frame(text, size=(640, 480), bg_color=(0, 0, 0), text_color='white',
         # Horizontal centering
         x = (size[0] - line_width) // 2
         
-        # Apply fade effect to text color
-        if isinstance(text_color, str):
-            # Convert color name to RGB
-            text_color_img = Image.new('RGB', (1, 1), text_color)
-            text_color_rgb = text_color_img.getpixel((0, 0))
-        else:
-            text_color_rgb = text_color
-            
-        faded_color = tuple(int(c * fade_factor) for c in text_color_rgb)
-        draw.text((x, y), line, font=font, fill=faded_color)
+        draw.text((x, y), line, font=font, fill=text_color)
         y += text_bbox[3] - text_bbox[1] + line_spacing
     
     # Convert PIL image to numpy array
@@ -180,64 +170,58 @@ def create_video_from_text(text, output_filename="output.mp4", duration=None,
     # Prepare video clips for each chunk
     video_clips = []
     
+    # Prepare background video if used
+    background_video_clip = None
+    if background_video:
+        background_video = os.path.normpath(background_video)
+        if not os.path.exists(background_video):
+            raise FileNotFoundError(f"Background video not found: {background_video}")
+        background_video_clip = VideoFileClip(background_video)
+    
     for i, data in enumerate(chunk_data):
         chunk = data['text']
         audio = data['audio']
         chunk_duration = data['duration']
         
-        # Create a function to generate frames with fade effects
-        def make_frame_with_fade(t, chunk_text=chunk):
-            # Calculate fade in/out factors
-            fade_duration = min(0.5, chunk_duration / 4)  # 0.5 seconds or 1/4 of duration
-            fade_in = min(t / fade_duration, 1) if t < fade_duration else 1
-            fade_out = min((chunk_duration - t) / fade_duration, 1) if t > (chunk_duration - fade_duration) else 1
-            fade_factor = min(fade_in, fade_out)
-            
-            if background_video:
+        # Create a function to generate frames for this specific chunk
+        def make_frame(t):
+            if background_video_clip:
                 # Get background frame
                 video_frame = background_video_clip.get_frame(t % background_video_clip.duration)
                 
-                # Create text frame with current fade factor
-                text_frame = create_frame(chunk_text, size=(video_frame.shape[1], video_frame.shape[0]),
+                # Create text frame
+                text_frame = create_frame(chunk, size=(video_frame.shape[1], video_frame.shape[0]),
                                        text_color=text_color, text_size=text_size,
-                                       text_position=text_position, fade_factor=fade_factor)
+                                       text_position=text_position)
                 
                 # Blend frames
-                return video_frame * 0.7 + text_frame * 0.3 * fade_factor
+                return video_frame * 0.7 + text_frame * 0.3
             else:
                 # Create frame with solid background
-                return create_frame(chunk_text, text_color=text_color, text_size=text_size,
-                                 text_position=text_position, bg_color=bg_color,
-                                 fade_factor=fade_factor)
+                return create_frame(chunk, text_color=text_color, text_size=text_size,
+                                 text_position=text_position, bg_color=bg_color)
         
-        if background_video:
-            # Load background video if not already loaded
-            if 'background_video_clip' not in locals():
-                background_video = os.path.normpath(background_video)
-                if not os.path.exists(background_video):
-                    raise FileNotFoundError(f"Background video not found: {background_video}")
-                background_video_clip = VideoFileClip(background_video)
-            
-            # Loop or trim background video to match chunk duration
+        # Create the video clip for this chunk
+        if background_video_clip:
+            # Trim or loop background video to match chunk duration
             if background_video_clip.duration < chunk_duration:
                 background_video_clip = background_video_clip.loop(duration=chunk_duration)
             else:
                 background_video_clip = background_video_clip.subclip(0, chunk_duration)
         
-        # Create the video clip for this chunk
-        chunk_video = VideoClip(lambda t: make_frame_with_fade(t), duration=chunk_duration)
+        chunk_video = VideoClip(make_frame, duration=chunk_duration)
         chunk_video = chunk_video.set_audio(audio)
         video_clips.append(chunk_video)
     
     # Concatenate all video clips
-    final_video = concatenate_videoclips(video_clips, method="compose")
+    final_video = concatenate_videoclips(video_clips)
     
     # Write the result
     final_video.write_videofile(output_filename, fps=24)
     
     # Clean up
     final_video.close()
-    if background_video and 'background_video_clip' in locals():
+    if background_video_clip:
         background_video_clip.close()
     
     for data in chunk_data:
