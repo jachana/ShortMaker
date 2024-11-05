@@ -11,6 +11,8 @@ A Python utility for creating short videos from text with optional background vi
 - Clean temporary file handling
 - Multiple TTS providers support (Google TTS, ElevenLabs, OpenAI)
 - **NEW: Text Chunking for Long Text Videos**
+- **NEW: Perfect Text-Audio Synchronization**
+- **NEW: Smooth Text Transitions with Fade Effects**
 
 ## Installation
 
@@ -41,12 +43,12 @@ create_video_from_text(
 )
 ```
 
-### Text Chunking for Long Text
+### Text Chunking and Synchronization
 
-For longer texts, use the new text chunking feature:
+For longer texts, use the enhanced text chunking feature with perfect audio synchronization:
 
 ```python
-# Automatically split long text into chunks
+# Automatically split long text into chunks with synchronized audio
 create_video_from_text(
     "A very long text that needs to be split into multiple chunks...",
     output_filename="long_text_video.mp4",
@@ -55,12 +57,15 @@ create_video_from_text(
 )
 ```
 
-#### Text Chunking Features
+#### Enhanced Text Features
 - Automatically splits long text into readable chunks
+- Perfect synchronization between text and audio
+- Smooth fade in/out transitions between chunks
 - Configurable chunk length
-- Smooth transitions between text chunks
-- Works with all TTS providers
 - Optional chunk overlap for context preservation
+- Works with all TTS providers
+- Adaptive text sizing and positioning
+- Resource-efficient audio handling
 
 ### Using ElevenLabs TTS
 
@@ -84,6 +89,16 @@ tts = ElevenLabsProvider(
 tts.generate_speech("Your text here", "output.mp3")
 ```
 
+## Text-Audio Synchronization
+
+The latest version includes significant improvements to text-audio synchronization:
+
+- **Pre-generation of Audio**: All audio chunks are generated first to ensure accurate timing
+- **Fade Effects**: Smooth transitions between text chunks with configurable fade durations
+- **Adaptive Timing**: Text display perfectly matches audio segment duration
+- **Resource Management**: Improved cleanup of temporary audio files
+- **Background Video Integration**: Synchronized text overlays with background video
+
 ## Testing
 
 The project includes a comprehensive test suite. To run the tests:
@@ -98,6 +113,8 @@ Tests cover:
 - Custom colors and text positions
 - Video creation with and without background
 - Text chunking functionality
+- Text-audio synchronization
+- Fade effects
 - Error handling for invalid inputs
 
 ## Requirements
