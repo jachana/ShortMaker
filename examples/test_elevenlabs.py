@@ -12,7 +12,7 @@ def test_elevenlabs_tts():
 
     # Test text
     text = "Hello! This is a test of the ElevenLabs text to speech system."
-    output_path = "test_output.mp3"
+    output_path = "tests/test_output.mp3"
 
     try:
         print("Generating speech...")
@@ -34,7 +34,7 @@ def test_elevenlabs_tts():
     finally:
         # Cleanup
         if os.path.exists(output_path):
-            #os.remove(output_path)
+            os.remove(output_path)
             print("Cleaned up test file")
 
 if __name__ == "__main__":
